@@ -116,9 +116,9 @@
 
   /* Comparison table */
   .comparison-table { margin-top: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .table-header { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr 80px; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .table-header { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
   .th { font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; }
-  .table-row { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr 80px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: start; transition: background 0.2s; cursor: pointer; }
+  .table-row { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: start; transition: background 0.2s; }
   .table-row:last-child { border-bottom: none; }
   .table-row:hover { background: rgba(255,255,255,0.02); }
   .table-row.recommended { background: rgba(79,110,247,0.06); border-left: 2px solid var(--accent); }
@@ -126,7 +126,7 @@
   .row-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
   .row-name-text { font-size: 13px; font-weight: 500; color: var(--text); }
   .row-rail-tag { font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 1px; }
-  .rec-badge { display: inline-block; padding: 1px 7px; background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.35); border-radius: 4px; font-family: var(--mono); font-size: 9px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+  .rec-badge { display: inline-block; padding: 2px 9px; background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.35); border-radius: 4px; font-family: var(--mono); font-size: 10px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
   .td { font-family: var(--mono); font-size: 12px; color: var(--text); line-height: 1.6; }
   .td.best { color: var(--accent2); }
   .td.mid { color: var(--text); }
@@ -134,9 +134,7 @@
   .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
   .score-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
   .score-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent2), var(--accent)); }
-  .select-btn { padding: 6px 14px; border-radius: 6px; font-family: var(--mono); font-size: 11px; cursor: pointer; border: 1px solid var(--border-bright); background: transparent; color: var(--text-muted); transition: all 0.2s; white-space: nowrap; }
-  .select-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
-  .select-btn.selected { background: var(--accent); border-color: var(--accent); color: white; }
+
 
   /* AI panel */
   .ai-panel { margin-top: 16px; border: 1px solid rgba(79,110,247,0.2); border-radius: 10px; background: rgba(79,110,247,0.04); padding: 16px; }
@@ -225,6 +223,7 @@
 
   <div class="context-note">
     <p><strong>What this demonstrates:</strong> An AI routing layer that evaluates available payment rails for a given cross-border payment scenario — scoring each on total cost, speed, and reliability to recommend the optimal route. Rails include <strong>VD Card (VisaNet push-to-debit)</strong>, <strong>VD Account / VPL (ex-Earthport bank account rail)</strong>, SWIFT, and Blockchain/Crypto (e.g. Grid by Lightspark). The same routing intelligence pattern applies at any layer of the payment stack: platform-level (choosing between networks) or network-level (choosing between internal rails to the same endpoint).</p>
+    <p style="margin-top:8px;font-size:11px;color:var(--text-dim)"><strong style="color:var(--text-muted)">Note on reliability figures:</strong> TSR (transaction success rate) values are illustrative estimates for demo purposes. No authoritative published benchmark exists across all rails and corridors. In a production routing engine, these would be derived from real-time transaction monitoring and historical corridor performance data per rail and partner.</p>
   </div>
 
   <div class="flow" id="flow">
@@ -266,8 +265,8 @@
             <div class="field-label">Recipient Endpoint</div>
             <div class="input-row">
               <select id="recipientType">
-                <option value="debit_card">Debit Card (16-digit PAN)</option>
                 <option value="bank_account">Bank Account (IBAN / CLABE / account number)</option>
+                <option value="debit_card">Debit Card (16-digit PAN)</option>
                 <option value="crypto_wallet">Crypto / Stablecoin Wallet</option>
               </select>
             </div>
@@ -348,7 +347,6 @@
             <div class="th">Speed</div>
             <div class="th">Reliability</div>
             <div class="th">Score</div>
-            <div class="th"></div>
           </div>
           <div id="comparisonRows"></div>
         </div>
@@ -393,7 +391,7 @@
 
 <script>
 // ── State ──
-const state = { speed:'instant', priority:'cheapest', amount:1000, dest:'MX', recipientType:'debit_card', selectedRail:null };
+const state = { speed:'instant', priority:'cheapest', amount:1000, dest:'MX', recipientType:'bank_account', selectedRail:null };
 
 // ── Country data ──
 const countries = {
@@ -421,7 +419,7 @@ const rails = {
     fxConversions:1,
     settlementLabel:'≤ 30 min', settlementSec:1800,
     settlementNote:'Fast Funds — issuing bank required to post within 30 min; typically seconds in practice',
-    reliability:0.998, supportsInstant:true, minAmt:1, maxAmt:50000,
+    reliability:0.997, supportsInstant:true, minAmt:1, maxAmt:50000,
     description:'VD Card (VisaNet) · VisaNet push-to-debit',
     prevalidation:'$0 auth to issuer — confirms account active and push-capable before funds move',
   },
@@ -434,7 +432,7 @@ const rails = {
     fxConversions:1,
     settlementLabel:'Next-day', settlementSec:86400,
     settlementNote:'Standard SLA is next-day; some corridors support same-day settlement',
-    reliability:0.975, supportsInstant:false, minAmt:1, maxAmt:500000,
+    reliability:0.971, supportsInstant:false, minAmt:1, maxAmt:500000,
     description:'VD Card (VisaNet) · VPL bank account rail (ex-Earthport)',
     prevalidation:'IBAN/account format validation only — account existence not confirmable pre-send in most corridors',
     note:'VPL connects to local bank clearing in 130+ countries. FX applied at settlement using VPL published rates.',
@@ -447,7 +445,7 @@ const rails = {
     fxMarkupBps:0,
     fxConversions:1,
     settlementLabel:'1–3 days', settlementSec:172800,
-    reliability:0.970, supportsInstant:false, minAmt:1000, maxAmt:10000000,
+    reliability:0.968, supportsInstant:false, minAmt:1000, maxAmt:10000000,
     description:'Correspondent banking network',
     prevalidation:'None — failure discovered after funds move',
   },
@@ -471,7 +469,7 @@ const rails = {
     fxMarkupBps:30, fxWhen:'embedded in locked quote rate',
     fxConversions: 1,
     settlementLabel:'< 60 sec', settlementSec:60,
-    reliability:0.991, supportsInstant:true, minAmt:1, maxAmt:50000,
+    reliability:0.940, supportsInstant:true, minAmt:1, maxAmt:50000,
     description:'Stablecoin / Lightning (e.g. Grid by Lightspark)',
     prevalidation:'Compliance screening + account validation via off-ramp partner pre-payment',
     note:'XB leg settles in seconds via stablecoin or Lightning. Last-mile delivery via local instant rail (PIX, UPI, SPEI etc.) requires pre-funded local currency at off-ramp partner.',
@@ -796,11 +794,11 @@ function renderComparison() {
       return reg ? '<span class="reg-warning-badge">⚠ ' + reg.label + '</span>' : '';
     })();
     return `
-      <div class="table-row ${isRec ? 'recommended' : ''}" onclick="selectRail('${name}')">
+      <div class="table-row ${isRec ? 'recommended' : ''}">
         <div class="row-name">
           <div class="row-icon" style="background:${rail.color}22;color:${rail.color}">${rail.icon}</div>
           <div>
-            <div class="row-name-text">${name} ${isRec ? '<span class="rec-badge">REC</span>' : ''} ${regBadge}</div>
+            <div class="row-name-text">${name} ${isRec ? '<span class="rec-badge">Recommended</span>' : ''} ${regBadge}</div>
             <div class="row-rail-tag">${rail.description}</div>
           </div>
         </div>
@@ -817,24 +815,9 @@ function renderComparison() {
             <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);width:28px;text-align:right">${score}</div>
           </div>
         </div>
-        <div class="td">
-          <button class="select-btn ${isRec ? 'selected' : ''}" id="selbtn-${name.replace(/\W/g,'_')}"
-            onclick="event.stopPropagation();selectRail('${name}')">
-            ${isRec ? 'Selected' : 'Select'}
-          </button>
-        </div>
+
       </div>`;
   }).join('');
-}
-
-function selectRail(name) {
-  state.selectedRail = name;
-  document.querySelectorAll('.table-row').forEach(r => r.classList.remove('recommended'));
-  document.querySelectorAll('.select-btn').forEach(b => { b.classList.remove('selected'); b.textContent = 'Select'; });
-  const key = name.replace(/\W/g,'_');
-  const btn = document.getElementById(`selbtn-${key}`);
-  if (btn) { btn.classList.add('selected'); btn.textContent = 'Selected'; }
-  renderAI(true);
 }
 
 // ── Step 5: AI explanation ──
