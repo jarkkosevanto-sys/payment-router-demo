@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Rail Intelligence · AI Routing Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0f;
+    --surface: #12141a;
+    --surface2: #1a1d26;
+    --border: #232636;
+    --border-bright: #2e3347;
+    --text: #e8eaf0;
+    --text-muted: #6b7194;
+    --text-dim: #3d4260;
+    --accent: #4f6ef7;
+    --accent-glow: rgba(79,110,247,0.15);
+    --accent2: #00d4aa;
+    --accent2-glow: rgba(0,212,170,0.12);
+    --warn: #f7934f;
+    --danger: #f75f5f;
+    --gold: #f7c94f;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Sora', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 48px 48px; opacity: 0.3; pointer-events: none; z-index: 0; }
+  body::after { content: ''; position: fixed; top: -200px; left: 50%; transform: translateX(-50%); width: 800px; height: 400px; background: radial-gradient(ellipse, rgba(79,110,247,0.08) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+  .wrapper { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* Header */
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .logo-mark { width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 16px; font-weight: 500; color: white; flex-shrink: 0; }
+  .header-text h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  .header-text p { font-size: 12px; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
+  .header-badge { margin-left: auto; background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.3); color: var(--accent); font-family: var(--mono); font-size: 11px; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.05em; }
+
+  /* Context note */
+  .context-note { margin-bottom: 32px; padding: 12px 16px; border: 1px solid var(--border-bright); border-left: 3px solid var(--accent); border-radius: 6px; background: rgba(79,110,247,0.04); }
+  .context-note p { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .context-note strong { color: var(--text); }
+
+  /* Steps */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .step-connector { width: 1px; height: 28px; background: linear-gradient(to bottom, var(--border-bright), var(--border)); margin-left: 19px; }
+  .step-connector.active { background: linear-gradient(to bottom, var(--accent), var(--border-bright)); }
+  .step { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; transition: border-color 0.3s, box-shadow 0.3s; }
+  .step.current { border-color: rgba(79,110,247,0.4); box-shadow: 0 0 0 1px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.4); }
+  .step.completed { border-color: rgba(0,212,170,0.2); }
+  .step-header { display: flex; align-items: center; gap: 14px; padding: 16px 20px; cursor: pointer; user-select: none; }
+  .step-number { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; font-weight: 500; flex-shrink: 0; border: 1px solid var(--border-bright); color: var(--text-muted); background: var(--surface2); transition: all 0.3s; }
+  .step.completed .step-number { background: rgba(0,212,170,0.15); border-color: rgba(0,212,170,0.4); color: var(--accent2); }
+  .step.current .step-number { background: var(--accent-glow); border-color: rgba(79,110,247,0.5); color: var(--accent); box-shadow: 0 0 12px rgba(79,110,247,0.3); }
+  .step-title-group { flex: 1; }
+  .step-label { font-size: 11px; font-family: var(--mono); color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
+  .step-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .step.current .step-title { color: #fff; }
+  .step-status { font-family: var(--mono); font-size: 11px; padding: 3px 10px; border-radius: 20px; }
+  .step-status.pending { color: var(--text-dim); background: rgba(255,255,255,0.03); border: 1px solid var(--border); }
+  .step-status.active-status { color: var(--accent); background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.3); animation: pulse-accent 2s ease-in-out infinite; }
+  .step-status.done { color: var(--accent2); background: var(--accent2-glow); border: 1px solid rgba(0,212,170,0.3); }
+  @keyframes pulse-accent { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .step-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); animation: fadeSlideIn 0.25s ease; }
+  .step-body.open { display: block; }
+  @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Input */
+  .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .input-grid .full { grid-column: 1 / -1; }
+  .field-label { font-family: var(--mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+  .field-group { display: flex; flex-direction: column; }
+  .input-row { display: flex; align-items: center; background: var(--surface2); border: 1px solid var(--border-bright); border-radius: 8px; overflow: hidden; transition: border-color 0.2s; }
+  .input-row:focus-within { border-color: rgba(79,110,247,0.5); box-shadow: 0 0 0 3px rgba(79,110,247,0.08); }
+  .input-prefix { padding: 0 12px; font-family: var(--mono); font-size: 13px; color: var(--text-muted); border-right: 1px solid var(--border); height: 40px; display: flex; align-items: center; background: rgba(255,255,255,0.02); flex-shrink: 0; }
+  input[type="number"], select { background: transparent; border: none; outline: none; color: var(--text); font-family: var(--mono); font-size: 14px; padding: 0 12px; height: 40px; width: 100%; -webkit-appearance: none; }
+  select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7194' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  select option { background: #1a1d26; }
+  .toggle-group { display: flex; background: var(--surface2); border: 1px solid var(--border-bright); border-radius: 8px; overflow: hidden; }
+  .toggle-btn { flex: 1; padding: 9px 8px; font-family: var(--mono); font-size: 11px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em; }
+  .toggle-btn.selected { background: var(--accent-glow); color: var(--accent); border-radius: 6px; }
+  .btn-primary { margin-top: 16px; width: 100%; padding: 12px; background: linear-gradient(135deg, var(--accent), #6b8fff); border: none; border-radius: 8px; color: white; font-family: var(--sans); font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s, transform 0.1s; letter-spacing: 0.02em; }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* Filter chips */
+  .filter-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 16px; }
+  .rail-chip { border-radius: 8px; padding: 12px; border: 1px solid var(--border); background: var(--surface2); }
+  .rail-chip.pass { border-color: rgba(0,212,170,0.3); background: rgba(0,212,170,0.05); }
+  .rail-chip.fail { border-color: rgba(247,95,95,0.2); background: rgba(247,95,95,0.03); opacity: 0.6; }
+  .rail-chip-name { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .rail-chip.fail .rail-chip-name { color: var(--text-muted); text-decoration: line-through; }
+  .filter-reason { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+  .rail-chip.pass .filter-reason { color: var(--accent2); }
+  .rail-chip.fail .filter-reason { color: var(--danger); font-size: 10px; }
+  .filter-tag { display: inline-block; margin-top: 6px; padding: 2px 7px; border-radius: 4px; font-family: var(--mono); font-size: 10px; }
+  .tag-pass { background: rgba(0,212,170,0.1); color: var(--accent2); }
+  .tag-fail { background: rgba(247,95,95,0.1); color: var(--danger); }
+
+  /* Quote fetch */
+  .quote-fetch-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px; }
+  .quote-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); padding: 14px; }
+  .quote-card.highlight { border-color: rgba(79,110,247,0.3); background: rgba(79,110,247,0.04); }
+  .quote-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .quote-card-name { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--text); }
+  .quote-source-badge { font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 4px; }
+  .badge-est { background: rgba(255,255,255,0.04); color: var(--text-dim); border: 1px solid var(--border); }
+  .quote-metric { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+  .quote-metric-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .quote-metric-value { font-family: var(--mono); font-size: 12px; color: var(--text); font-weight: 500; }
+  .quote-metric-value.highlight { color: var(--accent2); }
+  .quote-metric-value.fee { color: var(--warn); }
+  .muted { color: var(--text-muted); font-size: 12px; }
+  .mt8 { margin-top: 8px; }
+
+  /* Comparison table */
+  .comparison-table { margin-top: 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .table-header { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr 80px; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .th { font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; }
+  .table-row { display: grid; grid-template-columns: 2fr 1.2fr 1fr 1fr 1.2fr 80px; padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: start; transition: background 0.2s; cursor: pointer; }
+  .table-row:last-child { border-bottom: none; }
+  .table-row:hover { background: rgba(255,255,255,0.02); }
+  .table-row.recommended { background: rgba(79,110,247,0.06); border-left: 2px solid var(--accent); }
+  .row-name { display: flex; align-items: center; gap: 8px; }
+  .row-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .row-name-text { font-size: 13px; font-weight: 500; color: var(--text); }
+  .row-rail-tag { font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+  .rec-badge { display: inline-block; padding: 1px 7px; background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.35); border-radius: 4px; font-family: var(--mono); font-size: 9px; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+  .td { font-family: var(--mono); font-size: 12px; color: var(--text); line-height: 1.6; }
+  .td.best { color: var(--accent2); }
+  .td.mid { color: var(--text); }
+  .td.worst { color: var(--text-muted); }
+  .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .score-bar-bg { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+  .select-btn { padding: 6px 14px; border-radius: 6px; font-family: var(--mono); font-size: 11px; cursor: pointer; border: 1px solid var(--border-bright); background: transparent; color: var(--text-muted); transition: all 0.2s; white-space: nowrap; }
+  .select-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  .select-btn.selected { background: var(--accent); border-color: var(--accent); color: white; }
+
+  /* AI panel */
+  .ai-panel { margin-top: 16px; border: 1px solid rgba(79,110,247,0.2); border-radius: 10px; background: rgba(79,110,247,0.04); padding: 16px; }
+  .ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse-accent 1.5s ease-in-out infinite; }
+  .ai-label { font-family: var(--mono); font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+  .ai-text { font-size: 13px; line-height: 1.65; color: var(--text); }
+  .ai-highlight { color: var(--accent2); font-weight: 500; }
+  .ai-cursor { display: inline-block; width: 2px; height: 14px; background: var(--accent); margin-left: 2px; vertical-align: middle; animation: blink 1s ease infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  .tradeoff-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .tradeoff-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .tradeoff-title { font-family: var(--mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .tradeoff-value { font-size: 13px; font-weight: 600; color: var(--text); }
+  .tradeoff-sub { font-family: var(--mono); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Regulatory flag */
+  .reg-flag {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(247,147,79,0.4);
+    background: rgba(247,147,79,0.07);
+  }
+  .reg-flag-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--warn);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .reg-flag-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .reg-flag-source {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+  .reg-warning-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    background: rgba(247,147,79,0.15);
+    color: var(--warn);
+    border: 1px solid rgba(247,147,79,0.35);
+    white-space: nowrap;
+  }
+
+  /* Visa note box */
+  .visa-note { margin-top: 20px; border: 1px solid rgba(247,147,79,0.3); border-radius: 10px; background: rgba(247,147,79,0.05); padding: 14px 16px; }
+  .visa-note-header { font-family: var(--mono); font-size: 11px; color: var(--warn); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .visa-note-body { font-size: 12px; color: var(--text-muted); line-height: 1.65; }
+  .visa-note-body strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo-mark">⚡</div>
+    <div class="header-text">
+      <h1>Payment Rail Intelligence</h1>
+      <p>AI-Driven Routing Engine · Multi-Rail XB Payments</p>
+    </div>
+    <div class="header-badge">CONCEPT</div>
+  </header>
+
+  <div class="context-note">
+    <p><strong>What this demonstrates:</strong> An AI routing layer that evaluates available payment rails for a given cross-border payment scenario — scoring each on total cost, speed, and reliability to recommend the optimal route. Rails include <strong>VD Card (VisaNet push-to-debit)</strong>, <strong>VD Account / VPL (ex-Earthport bank account rail)</strong>, SWIFT, and Blockchain/Crypto (e.g. Grid by Lightspark). The same routing intelligence pattern applies at any layer of the payment stack: platform-level (choosing between networks) or network-level (choosing between internal rails to the same endpoint).</p>
+  </div>
+
+  <div class="flow" id="flow">
+
+    <!-- STEP 1: Payment Parameters -->
+    <div class="step current" id="step1">
+      <div class="step-header" onclick="toggleStep(1)">
+        <div class="step-number">1</div>
+        <div class="step-title-group">
+          <div class="step-label">Step 01</div>
+          <div class="step-title">Payment Parameters</div>
+        </div>
+        <div class="step-status active-status">Active</div>
+      </div>
+      <div class="step-body open" id="body1">
+        <div class="input-grid">
+          <div class="field-group">
+            <div class="field-label">Send Amount</div>
+            <div class="input-row">
+              <div class="input-prefix">USD</div>
+              <input type="number" id="sendAmount" value="1000" min="1" max="1000000">
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Destination Country</div>
+            <div class="input-row">
+              <select id="destCountry">
+                <option value="MX">🇲🇽 Mexico</option>
+                <option value="PH">🇵🇭 Philippines</option>
+                <option value="IN">🇮🇳 India</option>
+                <option value="BR">🇧🇷 Brazil</option>
+                <option value="GB">🇬🇧 United Kingdom</option>
+                <option value="DE">🇩🇪 Germany</option>
+                <option value="NG">🇳🇬 Nigeria</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Recipient Endpoint</div>
+            <div class="input-row">
+              <select id="recipientType">
+                <option value="debit_card">Debit Card (16-digit PAN)</option>
+                <option value="bank_account">Bank Account (IBAN / CLABE / account number)</option>
+                <option value="crypto_wallet">Crypto / Stablecoin Wallet</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Speed Requirement</div>
+            <div class="toggle-group" id="speedToggle">
+              <button class="toggle-btn selected" onclick="selToggle('speedToggle',this,'instant')">Instant</button>
+              <button class="toggle-btn" onclick="selToggle('speedToggle',this,'same-day')">Same-day</button>
+              <button class="toggle-btn" onclick="selToggle('speedToggle',this,'next-day')">Next-day</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Optimize For</div>
+            <div class="toggle-group" id="priorityToggle">
+              <button class="toggle-btn selected" onclick="selToggle('priorityToggle',this,'cheapest')">Cheapest</button>
+              <button class="toggle-btn" onclick="selToggle('priorityToggle',this,'fastest')">Fastest</button>
+              <button class="toggle-btn" onclick="selToggle('priorityToggle',this,'reliable')">Reliable</button>
+            </div>
+          </div>
+
+        </div>
+        <button class="btn-primary" onclick="runFlow()">Analyze Payment Routes →</button>
+      </div>
+    </div>
+
+    <div class="step-connector" id="conn1"></div>
+
+    <!-- STEP 2: Pre-filter -->
+    <div class="step" id="step2">
+      <div class="step-header" onclick="toggleStep(2)">
+        <div class="step-number">2</div>
+        <div class="step-title-group">
+          <div class="step-label">Step 02</div>
+          <div class="step-title">Rail Pre-filter</div>
+        </div>
+        <div class="step-status pending" id="status2">Pending</div>
+      </div>
+      <div class="step-body" id="body2">
+        <div class="filter-grid" id="filterGrid"></div>
+      </div>
+    </div>
+
+    <div class="step-connector" id="conn2"></div>
+
+    <!-- STEP 3: Quote Fetch -->
+    <div class="step" id="step3">
+      <div class="step-header" onclick="toggleStep(3)">
+        <div class="step-number">3</div>
+        <div class="step-title-group">
+          <div class="step-label">Step 03</div>
+          <div class="step-title">Parallel Quote Fetching</div>
+        </div>
+        <div class="step-status pending" id="status3">Pending</div>
+      </div>
+      <div class="step-body" id="body3">
+        <div class="quote-fetch-grid" id="quoteFetchGrid"></div>
+      </div>
+    </div>
+
+    <div class="step-connector" id="conn3"></div>
+
+    <!-- STEP 4: Comparison -->
+    <div class="step" id="step4">
+      <div class="step-header" onclick="toggleStep(4)">
+        <div class="step-number">4</div>
+        <div class="step-title-group">
+          <div class="step-label">Step 04</div>
+          <div class="step-title">Route Comparison</div>
+        </div>
+        <div class="step-status pending" id="status4">Pending</div>
+      </div>
+      <div class="step-body" id="body4">
+        <div class="comparison-table">
+          <div class="table-header">
+            <div class="th">Rail / Network</div>
+            <div class="th">Total Cost</div>
+            <div class="th">Speed</div>
+            <div class="th">Reliability</div>
+            <div class="th">Score</div>
+            <div class="th"></div>
+          </div>
+          <div id="comparisonRows"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-connector" id="conn4"></div>
+
+    <!-- STEP 5: AI Explanation -->
+    <div class="step" id="step5">
+      <div class="step-header" onclick="toggleStep(5)">
+        <div class="step-number">5</div>
+        <div class="step-title-group">
+          <div class="step-label">Step 05</div>
+          <div class="step-title">AI Routing Recommendation</div>
+        </div>
+        <div class="step-status pending" id="status5">Pending</div>
+      </div>
+      <div class="step-body" id="body5">
+        <div class="ai-panel">
+          <div class="ai-header">
+            <div class="ai-dot"></div>
+            <div class="ai-label">Routing Intelligence</div>
+          </div>
+          <div class="ai-text" id="aiText">
+            <span id="aiContent"></span>
+            <span class="ai-cursor" id="aiCursor" style="display:none"></span>
+          </div>
+          <div class="tradeoff-grid" id="tradeoffGrid" style="display:none"></div>
+        </div>
+
+        <!-- Visa internal routing note -->
+        <div class="visa-note" id="visaNote" style="display:none">
+          <div class="visa-note-header">⚙ One level deeper — intra-network routing</div>
+          <div class="visa-note-body" id="visaNoteBody"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──
+const state = { speed:'instant', priority:'cheapest', amount:1000, dest:'MX', recipientType:'debit_card', selectedRail:null };
+
+// ── Country data ──
+const countries = {
+  MX: { name:'Mexico',      currency:'MXN', flag:'🇲🇽', rail:'SPEI / CLABE',     region:'LATAM' },
+  PH: { name:'Philippines', currency:'PHP', flag:'🇵🇭', rail:'InstaPay',          region:'SEA'   },
+  IN: { name:'India',       currency:'INR', flag:'🇮🇳', rail:'UPI',               region:'Asia'  },
+  BR: { name:'Brazil',      currency:'BRL', flag:'🇧🇷', rail:'PIX',               region:'LATAM' },
+  GB: { name:'UK',          currency:'GBP', flag:'🇬🇧', rail:'Faster Payments',   region:'Europe'},
+  DE: { name:'Germany',     currency:'EUR', flag:'🇩🇪', rail:'SEPA Instant',      region:'Europe'},
+  NG: { name:'Nigeria',     currency:'NGN', flag:'🇳🇬', rail:'NIP',               region:'Africa'},
+};
+
+const midMarket = { MXN:17.12, PHP:56.24, INR:83.45, BRL:5.08, GBP:0.79, EUR:0.92, NGN:1580 };
+
+// ── Rail definitions ──
+// Each rail has corridor coverage, cost model, speed, reliability,
+// and which recipient endpoint types it supports.
+const rails = {
+  'VD Card (VisaNet)': {
+    icon:'💳', color:'#1a1f71',
+    corridors:['MX','PH','IN','BR','GB','DE'],
+    endpoints:['debit_card'],                      // reaches 16-digit PANs via VisaNet
+    costBps:20, flatFee:1.50, feeCap:3.00,
+    fxMarkupBps:160, fxWhen:'at settlement (floating)',
+    fxConversions:1,
+    settlementLabel:'≤ 30 min', settlementSec:1800,
+    settlementNote:'Fast Funds — issuing bank required to post within 30 min; typically seconds in practice',
+    reliability:0.998, supportsInstant:true, minAmt:1, maxAmt:50000,
+    description:'VD Card (VisaNet) · VisaNet push-to-debit',
+    prevalidation:'$0 auth to issuer — confirms account active and push-capable before funds move',
+  },
+  'VD Account (VPL)': {
+    icon:'🏦', color:'#1a4fa0',
+    corridors:['MX','PH','IN','BR','GB','DE','NG'],
+    endpoints:['bank_account'],                    // reaches bank accounts via VPL (ex-Earthport)
+    costBps:0, flatFee:3.50, feeCap:null,          // flat-fee dominant; $3.50 est. per transaction
+    fxMarkupBps:80, fxWhen:'at settlement (VPL rate)',  // ~0.8% FX spread est.
+    fxConversions:1,
+    settlementLabel:'Next-day', settlementSec:86400,
+    settlementNote:'Standard SLA is next-day; some corridors support same-day settlement',
+    reliability:0.975, supportsInstant:false, minAmt:1, maxAmt:500000,
+    description:'VD Card (VisaNet) · VPL bank account rail (ex-Earthport)',
+    prevalidation:'IBAN/account format validation only — account existence not confirmable pre-send in most corridors',
+    note:'VPL connects to local bank clearing in 130+ countries. FX applied at settlement using VPL published rates.',
+  },
+  'SWIFT Wire': {
+    icon:'🏦', color:'#6b7194',
+    corridors:['MX','PH','IN','BR','GB','DE','NG'],
+    endpoints:['bank_account'],
+    costBps:50, flatFee:25, feeCap:null,
+    fxMarkupBps:0,
+    fxConversions:1,
+    settlementLabel:'1–3 days', settlementSec:172800,
+    reliability:0.970, supportsInstant:false, minAmt:1000, maxAmt:10000000,
+    description:'Correspondent banking network',
+    prevalidation:'None — failure discovered after funds move',
+  },
+  'ACH / RTP': {
+    icon:'🏛', color:'#4b5563',
+    corridors:[],                                  // US domestic only
+    endpoints:['bank_account'],
+    costBps:25, flatFee:0, feeCap:null,
+    fxMarkupBps:0,
+    fxConversions:0,
+    settlementLabel:'Instant–2 days', settlementSec:86400,
+    reliability:0.990, supportsInstant:true, minAmt:1, maxAmt:1000000,
+    description:'US domestic rails (RTP/FedNow/ACH)',
+    prevalidation:'Micro-deposit or Plaid account verification',
+  },
+  'Blockchain / Crypto': {
+    icon:'⚡', color:'#4f6ef7',
+    corridors:['MX','PH','IN','BR','GB','DE','NG'],
+    endpoints:['bank_account','crypto_wallet'],    // reaches bank accounts via off-ramp + crypto wallets natively
+    costBps:50, flatFee:0, feeCap:null,
+    fxMarkupBps:30, fxWhen:'embedded in locked quote rate',
+    fxConversions: 1,
+    settlementLabel:'< 60 sec', settlementSec:60,
+    reliability:0.991, supportsInstant:true, minAmt:1, maxAmt:50000,
+    description:'Stablecoin / Lightning (e.g. Grid by Lightspark)',
+    prevalidation:'Compliance screening + account validation via off-ramp partner pre-payment',
+    note:'XB leg settles in seconds via stablecoin or Lightning. Last-mile delivery via local instant rail (PIX, UPI, SPEI etc.) requires pre-funded local currency at off-ramp partner.',
+  },
+};
+
+// ── Corridor-specific instant delivery capability ──
+// Instant last-mile delivery requires: (a) a reliable domestic real-time rail at destination,
+// and (b) a pre-funded local currency account held by the off-ramp/VPL partner.
+// Both conditions are met in the corridors listed below.
+const instantCorridors = {
+  'VD Account (VPL)': {
+    // VPL has established instant-capable partnerships in mature instant payment markets
+    corridors: ['MX','BR','IN','GB','DE'],
+    // MX=SPEI, BR=PIX, IN=UPI, GB=Faster Payments, DE=SEPA Instant
+    // NG excluded: NIP capable but VPL partner coverage thinner, higher failure risk
+    // PH excluded: VPL less established for InstaPay vs blockchain off-ramp partners
+    label: '< 60 sec',
+    labelSlow: 'Next-day',
+    secFast: 60,
+    secSlow: 86400,
+    note: 'Instant via pre-funded local partner account + domestic real-time rail',
+  },
+  'Blockchain / Crypto': {
+    // Blockchain off-ramp partners are often more nimble in emerging market connectivity
+    corridors: ['MX','BR','IN','GB','DE','PH'],
+    // PH included: InstaPay well-integrated by blockchain off-ramp networks
+    // NG excluded: NIP reachable but corridor reliability lower, pre-funding thinner
+    label: '< 60 sec',
+    labelSlow: 'Next-day',
+    secFast: 60,
+    secSlow: 86400,
+    note: 'Instant via pre-funded MXN/BRL/INR/etc. at off-ramp partner + domestic instant rail',
+  },
+};
+
+// ── Dynamic rail properties per corridor ──
+// Returns settlement label and seconds adjusted for the current corridor
+function getRailProps(name, rail) {
+  const ic = instantCorridors[name];
+  if (!ic) return {
+    settlementLabel: rail.settlementLabel,
+    settlementSec: rail.settlementSec,
+    supportsInstant: rail.supportsInstant,
+    instantNote: null,
+  };
+  const isInstantCorridor = ic.corridors.includes(state.dest);
+  return {
+    settlementLabel: isInstantCorridor ? ic.label : ic.labelSlow,
+    settlementSec: isInstantCorridor ? ic.secFast : ic.secSlow,
+    supportsInstant: isInstantCorridor,
+    instantNote: isInstantCorridor ? ic.note : 'Instant not available in this corridor — next-day via local bank transfer',
+  };
+}
+
+// ── Regulatory restrictions by corridor and rail ──
+// Flags corridors where a rail faces regulatory constraints.
+// 'warning' = available but restricted (show flag, don't exclude)
+// 'excluded' = not available due to regulation (exclude from routing)
+const regulatoryRestrictions = {
+  'Blockchain / Crypto': {
+    BR: {
+      level: 'warning',
+      label: 'Regulatory restriction',
+      summary: 'BCB Resolution 561 — effective Oct 1, 2026',
+      detail: "Brazil's central bank bans eFX providers from using stablecoins or crypto (USDC, USDT, BTC) as the settlement rail for regulated cross-border payments. Available only to BCB-licensed VASP institutions (banks, authorised FX brokers). Unlicensed eFX providers must migrate to fiat rails by Oct 1, 2026.",
+      source: 'BCB Resolution No. 561, published Apr 30, 2026',
+    },
+  },
+};
+
+// Helper: get regulatory status for a rail in the current corridor
+function getRegulatoryStatus(name) {
+  const r = regulatoryRestrictions[name];
+  if (!r || !r[state.dest]) return null;
+  return r[state.dest];
+}
+
+// ── Helpers ──
+function selToggle(groupId, btn, val) {
+  document.querySelectorAll(`#${groupId} .toggle-btn`).forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  if (groupId === 'speedToggle') state.speed = val;
+  if (groupId === 'priorityToggle') state.priority = val;
+}
+function toggleStep(n) { const b = document.getElementById(`body${n}`); if (b) b.classList.toggle('open'); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function activateStep(n) {
+  const step = document.getElementById(`step${n}`);
+  const st = document.getElementById(`status${n}`);
+  const body = document.getElementById(`body${n}`);
+  const conn = document.getElementById(`conn${n-1}`);
+  if (step) { step.classList.remove('completed'); step.classList.add('current'); }
+  if (st) { st.className = 'step-status active-status'; st.textContent = 'Running'; }
+  if (body) body.classList.add('open');
+  if (conn) conn.classList.add('active');
+  setTimeout(() => step && step.scrollIntoView({ behavior:'smooth', block:'nearest' }), 100);
+}
+
+function completeStep(n, label='Done') {
+  const step = document.getElementById(`step${n}`);
+  const st = document.getElementById(`status${n}`);
+  const num = step && step.querySelector('.step-number');
+  if (step) { step.classList.remove('current'); step.classList.add('completed'); }
+  if (st) { st.className = 'step-status done'; st.textContent = label; }
+  if (num) num.textContent = '✓';
+}
+
+// ── Fee calculation ──
+function calcFee(rail, amount) {
+  const raw = amount * rail.costBps / 10000 + (rail.flatFee || 0);
+  return rail.feeCap ? Math.min(raw, rail.feeCap) : raw;
+}
+function calcFxCost(rail, amount) { return (rail.fxMarkupBps || 0) * amount / 10000; }
+function calcTotal(rail, amount) { return calcFee(rail, amount) + calcFxCost(rail, amount); }
+
+// ── Passing rails ──
+function getPassingRails() {
+  return Object.entries(rails).filter(([name, rail]) => {
+    if (rail.corridors.length > 0 && !rail.corridors.includes(state.dest)) return false;
+    if (rail.corridors.length === 0 && state.dest !== 'US') return false;
+    if (!rail.endpoints.includes(state.recipientType)) return false;
+    // Use dynamic instant capability for corridor-aware rails
+    const props = getRailProps(name, rail);
+    if (state.speed === 'instant' && !props.supportsInstant) return false;
+    if (state.amount < rail.minAmt || state.amount > (rail.maxAmt || Infinity)) return false;
+    return true;
+  });
+}
+
+// ── Scoring ──
+function scoreRail(name, rail) {
+  const w = {
+    cheapest: { cost:0.6, speed:0.2, reliability:0.2 },
+    fastest:  { cost:0.2, speed:0.6, reliability:0.2 },
+    reliable: { cost:0.2, speed:0.2, reliability:0.6 },
+  }[state.priority];
+  const totalPct = calcTotal(rail, state.amount) / state.amount;
+  const costScore = Math.max(0, 1 - totalPct / 0.05);
+  // Use corridor-aware settlement time for speed scoring
+  const props = getRailProps(name, rail);
+  const threshold = { instant:60, 'same-day':86400, 'next-day':172800 }[state.speed] || 172800;
+  const speedScore = state.priority === 'fastest'
+    ? 1 - Math.min(props.settlementSec, 200000) / 200000
+    : props.settlementSec <= threshold ? 1.0 : 0.0;
+  return Math.round((w.cost * costScore + w.speed * speedScore + w.reliability * rail.reliability) * 100);
+}
+
+// ── MAIN FLOW ──
+async function runFlow() {
+  state.amount = parseFloat(document.getElementById('sendAmount').value) || 1000;
+  state.dest = document.getElementById('destCountry').value;
+  state.recipientType = document.getElementById('recipientType').value;
+
+  // Reset — clear stale state including previous rail selection
+  state.selectedRail = null;
+  for (let i = 2; i <= 5; i++) {
+    const step = document.getElementById('step' + i);
+    const st = document.getElementById('status' + i);
+    const body = document.getElementById('body' + i);
+    const num = step && step.querySelector('.step-number');
+    if (step) step.className = 'step';
+    if (st) { st.className = 'step-status pending'; st.textContent = 'Pending'; st.style.color = ''; st.style.border = ''; }
+    if (body) body.classList.remove('open');
+    if (num) num.textContent = i;
+    const conn = document.getElementById('conn' + (i-1));
+    if (conn) conn.classList.remove('active');
+  }
+  // Clear content from previous run
+  document.getElementById('filterGrid').innerHTML = '';
+  document.getElementById('quoteFetchGrid').innerHTML = '';
+  document.getElementById('quoteFetchGrid').style.gridTemplateColumns = '';
+  document.getElementById('comparisonRows').innerHTML = '';
+  document.getElementById('aiContent').innerHTML = '';
+  document.getElementById('tradeoffGrid').style.display = 'none';
+  document.getElementById('visaNote').style.display = 'none';
+  completeStep(1, 'Set');
+
+  // Step 2: Pre-filter
+  await delay(300); activateStep(2); await delay(400);
+  renderFilter(); await delay(700); completeStep(2, 'Done');
+
+  // Check if any rails passed — if not, show no-match message and stop
+  const passing = getPassingRails();
+  if (passing.length === 0) {
+    activateStep(3);
+    const qg = document.getElementById('quoteFetchGrid');
+    qg.style.gridTemplateColumns = '1fr';
+    qg.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:13px;">' +
+      '<div style="font-size:24px;margin-bottom:8px">⚠</div>' +
+      '<div style="font-weight:500;color:var(--warn)">No rails available for this combination</div>' +
+      '<div style="margin-top:8px;font-size:11px;color:var(--text-dim);line-height:1.6">' +
+      'Try relaxing the speed requirement (Same-day or Next-day),<br>' +
+      'changing the recipient endpoint, or selecting a different corridor.' +
+      '</div></div>';
+    document.getElementById('body3').classList.add('open');
+    const st3 = document.getElementById('status3');
+    if (st3) { st3.textContent = 'No match'; st3.style.color = 'var(--warn)'; st3.style.border = '1px solid rgba(247,147,79,0.4)'; st3.style.background = 'rgba(247,147,79,0.08)'; }
+    return;
+  }
+
+  // Step 3: Quotes
+  await delay(200); activateStep(3); await delay(300);
+  renderQuotes(); await delay(1000); completeStep(3, 'Done');
+
+  // Step 4: Comparison
+  await delay(200); activateStep(4); await delay(300);
+  renderComparison(); await delay(600); completeStep(4, 'Done');
+
+  // Step 5: AI
+  await delay(200); activateStep(5); await delay(300);
+  await renderAI(); completeStep(5, 'Done');
+}
+
+// ── Step 2: Filter ──
+function renderFilter() {
+  const country = countries[state.dest];
+  const grid = document.getElementById('filterGrid');
+  const results = Object.entries(rails).map(([name, rail]) => {
+    const reasons = [];
+    let pass = true;
+    if (rail.corridors.length > 0 && !rail.corridors.includes(state.dest)) { reasons.push(`✗ ${country.name} not supported`); pass = false; }
+    if (rail.corridors.length === 0 && state.dest !== 'US') { reasons.push('✗ US domestic only'); pass = false; }
+    if (!rail.endpoints.includes(state.recipientType)) {
+      const endpointLabels = { debit_card:'Debit card', bank_account:'Bank account', crypto_wallet:'Crypto wallet' };
+      reasons.push(`✗ Does not reach ${endpointLabels[state.recipientType]}`); pass = false;
+    }
+    const filterProps = getRailProps(name, rail);
+    if (state.speed === 'instant' && !filterProps.supportsInstant) {
+      reasons.push(instantCorridors[name]
+        ? `✗ Instant not available in ${country.name} — next-day only`
+        : '✗ Not instant-capable');
+      pass = false;
+    }
+    if (state.amount > (rail.maxAmt || Infinity)) { reasons.push(`✗ Max $${(rail.maxAmt||0).toLocaleString()}`); pass = false; }
+    if (state.amount < rail.minAmt) { reasons.push(`✗ Min $${rail.minAmt.toLocaleString()}`); pass = false; }
+    if (pass) {
+      const instantTag = filterProps.supportsInstant
+        ? `✓ Instant capable (${countries[state.dest]?.rail || 'local rail'})`
+        : `⏱ Next-day (instant not available — ${state.dest})`;
+      reasons.push(`✓ Eligible — ${rail.description}`);
+      if (instantCorridors[name]) reasons.push(instantTag);
+      const regStatus = getRegulatoryStatus(name);
+      if (regStatus) reasons.push(`⚠ ${regStatus.label}: ${regStatus.summary}`);
+    }
+    return { name, rail, pass, reasons };
+  });
+  grid.style.gridTemplateColumns = `repeat(${Math.min(results.length, 5)}, 1fr)`;
+  grid.innerHTML = results.map(({ name, rail, pass, reasons }) => `
+    <div class="rail-chip ${pass ? 'pass' : 'fail'}">
+      <div class="rail-chip-name">${rail.icon} ${name}</div>
+      ${reasons.map(r => `<div class="filter-reason">${r}</div>`).join('')}
+      <span class="filter-tag ${pass ? 'tag-pass' : 'tag-fail'}">${pass ? 'INCLUDED' : 'EXCLUDED'}</span>
+    </div>`).join('');
+}
+
+// ── Step 3: Quotes ──
+function renderQuotes() {
+  const passing = getPassingRails();
+  const grid = document.getElementById('quoteFetchGrid');
+  const cols = passing.length <= 2 ? passing.length : 3;
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.innerHTML = passing.map(([name, rail]) => {
+    const fee = calcFee(rail, state.amount);
+    const fxCost = calcFxCost(rail, state.amount);
+    const total = fee + fxCost;
+    const country = countries[state.dest];
+    const rate = midMarket[country.currency] * (1 - (rail.fxMarkupBps || 0) / 10000);
+    const recv = ((state.amount - fee) * rate).toFixed(0);
+    const isBlockchain = name === 'Blockchain / Crypto';
+    const props = getRailProps(name, rail);
+    const settlementColor = props.supportsInstant ? 'var(--accent2)' : 'var(--text)';
+    return `
+      <div class="quote-card ${isBlockchain ? 'highlight' : ''}">
+        <div class="quote-card-header">
+          <div class="quote-card-name">${rail.icon} ${name}</div>
+          <span class="quote-source-badge badge-est">~ ESTIMATED</span>
+        </div>
+        <div class="quote-metric"><span class="quote-metric-label">Transfer fee</span><span class="quote-metric-value fee">~$${fee.toFixed(2)}${rail.feeCap && fee >= rail.feeCap ? ' (cap)' : ''}</span></div>
+        ${fxCost > 0 ? `<div class="quote-metric"><span class="quote-metric-label">FX cost est.</span><span class="quote-metric-value" style="color:var(--warn)">~$${fxCost.toFixed(2)} (${(rail.fxMarkupBps/100).toFixed(1)}%, ${rail.fxWhen || 'at settlement'})</span></div>` : ''}
+        <div class="quote-metric" style="border-top:1px solid var(--border);padding-top:4px;margin-top:4px"><span class="quote-metric-label" style="color:var(--text)">Total cost</span><span class="quote-metric-value" style="color:var(--text);font-weight:600">~$${total.toFixed(2)}</span></div>
+        <div class="quote-metric"><span class="quote-metric-label">Est. receive</span><span class="quote-metric-value highlight">${Number(recv).toLocaleString()} ${country.currency}</span></div>
+        <div class="quote-metric"><span class="quote-metric-label">Settlement</span><span class="quote-metric-value" style="color:${settlementColor}">${props.settlementLabel}</span></div>
+        ${instantCorridors[name] ? `<div class="muted mt8" style="font-size:10px;color:${props.supportsInstant ? 'var(--accent2)' : 'var(--text-dim)'}">${props.instantNote}</div>` : ''}
+        ${rail.fxConversions > 0 ? `<div class="quote-metric"><span class="quote-metric-label" style="color:var(--text-dim)">FX conversions</span><span class="quote-metric-value" style="font-size:11px;color:var(--text-muted)">${rail.fxConversions}</span></div>` : ''}
+        ${rail.note ? `<div class="muted mt8" style="font-size:10px;line-height:1.4">${rail.note}</div>` : ''}
+        ${getRegulatoryStatus(name) ? '<div class="reg-flag"><div class="reg-flag-header">⚠ ' + getRegulatoryStatus(name).label + '</div><div class="reg-flag-detail">' + getRegulatoryStatus(name).detail + '</div><div class="reg-flag-source">' + getRegulatoryStatus(name).source + '</div></div>' : ''}
+        <div class="muted mt8">Estimates — not locked</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Step 4: Comparison ──
+function renderComparison() {
+  const passing = getPassingRails();
+  const scored = passing.map(([name, rail]) => ({ name, rail, score: scoreRail(name, rail) }))
+    .sort((a, b) => b.score - a.score);
+  state.selectedRail = scored[0]?.name || null;
+  const country = countries[state.dest];
+  const rows = document.getElementById('comparisonRows');
+  rows.innerHTML = scored.map(({ name, rail, score }, i) => {
+    const isRec = i === 0;
+    const fee = calcFee(rail, state.amount);
+    const fxCost = calcFxCost(rail, state.amount);
+    const total = fee + fxCost;
+    const totalPct = (total / state.amount * 100).toFixed(2);
+    const costPctNum = total / state.amount * 100;
+    const costClass = costPctNum <= 1.0 ? 'best' : costPctNum <= 2.5 ? 'mid' : 'worst';
+    const props = getRailProps(name, rail);
+    const relClass = rail.reliability >= 0.995 ? 'best' : rail.reliability >= 0.98 ? 'mid' : 'worst';
+    const speedClass = props.settlementSec <= 60 ? 'best' : props.settlementSec <= 1800 ? 'mid' : 'worst';
+    const regBadge = (() => {
+      const reg = getRegulatoryStatus(name);
+      return reg ? '<span class="reg-warning-badge">⚠ ' + reg.label + '</span>' : '';
+    })();
+    return `
+      <div class="table-row ${isRec ? 'recommended' : ''}" onclick="selectRail('${name}')">
+        <div class="row-name">
+          <div class="row-icon" style="background:${rail.color}22;color:${rail.color}">${rail.icon}</div>
+          <div>
+            <div class="row-name-text">${name} ${isRec ? '<span class="rec-badge">REC</span>' : ''} ${regBadge}</div>
+            <div class="row-rail-tag">${rail.description}</div>
+          </div>
+        </div>
+        <div class="td ${costClass}" style="line-height:1.6">
+          <div style="font-weight:500">~$${total.toFixed(2)} <span style="color:var(--text-dim);font-size:10px">${totalPct}%</span></div>
+          <div style="font-size:10px;color:var(--text-muted)">$${fee.toFixed(2)} fee${fxCost > 0 ? ` + $${fxCost.toFixed(2)} FX` : ''}</div>
+          ${rail.fxConversions > 0 ? `<div style="font-size:10px;color:var(--text-dim);font-style:italic">${rail.fxConversions} FX conversion${rail.fxConversions > 1 ? 's' : ''}</div>` : ''}
+        </div>
+        <div class="td ${speedClass}" title="${props.instantNote || rail.settlementNote || ''}">${props.settlementLabel}${(props.supportsInstant && instantCorridors[name]) ? ' ✓' : (instantCorridors[name] && !props.supportsInstant ? ' —' : '')}</div>
+        <div class="td ${relClass}">${(rail.reliability * 100).toFixed(1)}%</div>
+        <div class="td">
+          <div class="score-bar-wrap">
+            <div class="score-bar-bg"><div class="score-bar-fill" style="width:${score}%"></div></div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-muted);width:28px;text-align:right">${score}</div>
+          </div>
+        </div>
+        <div class="td">
+          <button class="select-btn ${isRec ? 'selected' : ''}" id="selbtn-${name.replace(/\W/g,'_')}"
+            onclick="event.stopPropagation();selectRail('${name}')">
+            ${isRec ? 'Selected' : 'Select'}
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function selectRail(name) {
+  state.selectedRail = name;
+  document.querySelectorAll('.table-row').forEach(r => r.classList.remove('recommended'));
+  document.querySelectorAll('.select-btn').forEach(b => { b.classList.remove('selected'); b.textContent = 'Select'; });
+  const key = name.replace(/\W/g,'_');
+  const btn = document.getElementById(`selbtn-${key}`);
+  if (btn) { btn.classList.add('selected'); btn.textContent = 'Selected'; }
+  renderAI(true);
+}
+
+// ── Step 5: AI explanation ──
+async function renderAI(silent = false) {
+  const rail = state.selectedRail ? rails[state.selectedRail] : null;
+  if (!rail) return;
+  const country = countries[state.dest];
+  const passing = getPassingRails();
+  const excluded = Object.entries(rails).filter(([n]) => !passing.find(([p]) => p === n));
+  const fee = calcFee(rail, state.amount);
+  const fxCost = calcFxCost(rail, state.amount);
+  const total = fee + fxCost;
+  const totalStr = `~$${total.toFixed(2)} all-in`;
+  const feeLabel = `~$${fee.toFixed(2)}${rail.feeCap && fee >= rail.feeCap ? ' (capped)' : ''}`;
+  const priorityText = { cheapest:'minimize total cost', fastest:'maximize speed', reliable:'maximize reliability' }[state.priority];
+  const scored = passing.map(([n, r]) => ({ name: n, score: scoreRail(n, r) })).sort((a,b) => b.score - a.score);
+  const altEntry = scored.find(s => s.name !== state.selectedRail);
+  const altRail = altEntry ? rails[altEntry.name] : null;
+  const altTotal = altRail ? calcTotal(altRail, state.amount) : null;
+
+  // Cost note
+  let costNote = '';
+  if (state.selectedRail === 'Blockchain / Crypto') {
+    costNote = ` Transfer fee <span class="ai-highlight">${feeLabel}</span> + est. ${(rail.fxMarkupBps/100).toFixed(1)}% FX spread embedded in locked quote rate (~$${fxCost.toFixed(2)}), totalling <span class="ai-highlight">${totalStr}</span>. Rate locked at quote time — recipient amount guaranteed before execution. ${rail.fxConversions === 1 ? '<span style="color:var(--accent2)">Single FX conversion (stablecoin→local).</span>' : ''}`;
+  } else if (rail.fxMarkupBps) {
+    costNote = ` Transfer fee <span class="ai-highlight">${feeLabel}</span> + est. ${(rail.fxMarkupBps/100).toFixed(1)}% FX markup at settlement (~$${fxCost.toFixed(2)}), totalling <span class="ai-highlight">${totalStr}</span>. Note: FX rate floats to settlement — not locked at initiation.`;
+  } else {
+    costNote = ` Transfer fee <span class="ai-highlight">${feeLabel}</span>. No FX conversion (same-currency or domestic rail).`;
+  }
+
+  // Alternative comparison
+  let altNote = '';
+  if (altRail && altTotal !== null) {
+    if (state.priority === 'cheapest') {
+      const ratio = (altTotal / total).toFixed(1);
+      altNote = `Alternative <span class="ai-highlight">${altEntry.name}</span> costs ~$${altTotal.toFixed(2)} all-in — ${ratio}× ${altTotal > total ? 'more expensive' : 'cheaper'}. `;
+    } else if (state.priority === 'fastest') {
+      altNote = `Alternative <span class="ai-highlight">${altEntry.name}</span> settles in ${altRail.settlementLabel} vs ${rail.settlementLabel}. `;
+    } else {
+      altNote = `Alternative <span class="ai-highlight">${altEntry.name}</span> has ${(altRail.reliability*100).toFixed(1)}% reliability vs ${(rail.reliability*100).toFixed(1)}%. `;
+    }
+  }
+
+  const prevalidNote = rail.prevalidation ? ` Pre-validation: ${rail.prevalidation}.` : '';
+  const regStatus = getRegulatoryStatus(state.selectedRail);
+  const regNote = regStatus
+    ? ` <span style="color:var(--warn)">⚠ Regulatory note: ${regStatus.summary}. ${regStatus.detail}</span>`
+    : '';
+
+  const fullText =
+    `<span class="ai-highlight">${state.selectedRail}</span> recommended for this ` +
+    `<span class="ai-highlight">USD → ${country.currency}</span> transfer of ` +
+    `<span class="ai-highlight">$${state.amount.toLocaleString()}</span>.` +
+    ` Optimization target: <span class="ai-highlight">${priorityText}</span>.` +
+    ` Settlement in <span class="ai-highlight">${rail.settlementLabel}</span> via ${rail.description}.` +
+    costNote + prevalidNote + ` Corridor reliability: <span class="ai-highlight">${(rail.reliability*100).toFixed(1)}%</span>. ` +
+    altNote +
+    regNote +
+    (excluded.length ? `<span style="color:var(--text-dim)"> Excluded: ${excluded.map(([n])=>n).join(', ')} — failed pre-filter constraints.</span>` : '');
+
+  const contentEl = document.getElementById('aiContent');
+  const cursorEl = document.getElementById('aiCursor');
+  const tradeoffEl = document.getElementById('tradeoffGrid');
+  const visaNote = document.getElementById('visaNote');
+  const visaNoteBody = document.getElementById('visaNoteBody');
+
+  if (silent) {
+    contentEl.innerHTML = fullText;
+    renderTradeoffs(tradeoffEl, rail, fee, fxCost);
+    renderVisaNote(visaNote, visaNoteBody);
+    return;
+  }
+
+  contentEl.innerHTML = '';
+  cursorEl.style.display = 'inline-block';
+  tradeoffEl.style.display = 'none';
+  visaNote.style.display = 'none';
+
+  const plain = fullText.replace(/<[^>]+>/g, '');
+  let charI = 0;
+  await new Promise(resolve => {
+    const iv = setInterval(() => {
+      charI += 3;
+      if (charI >= plain.length) {
+        clearInterval(iv);
+        contentEl.innerHTML = fullText;
+        cursorEl.style.display = 'none';
+        renderTradeoffs(tradeoffEl, rail, fee, fxCost);
+        tradeoffEl.style.display = 'grid';
+        renderVisaNote(visaNote, visaNoteBody);
+        resolve();
+      } else {
+        contentEl.textContent = plain.substring(0, charI);
+      }
+    }, 16);
+  });
+}
+
+function renderTradeoffs(el, rail, fee, fxCost) {
+  const total = fee + fxCost;
+  el.innerHTML = `
+    <div class="tradeoff-card">
+      <div class="tradeoff-title">Total cost</div>
+      <div class="tradeoff-value" style="color:var(--warn)">~$${total.toFixed(2)}</div>
+      <div class="tradeoff-sub">${fee.toFixed(2)} fee${fxCost > 0 ? ` + ${fxCost.toFixed(2)} FX` : ''}</div>
+    </div>
+    <div class="tradeoff-card">
+      <div class="tradeoff-title">Settlement SLA</div>
+      <div class="tradeoff-value" style="color:var(--accent2)">${rail.settlementLabel}</div>
+      <div class="tradeoff-sub">${rail.description}</div>
+    </div>
+    <div class="tradeoff-card">
+      <div class="tradeoff-title">Reliability</div>
+      <div class="tradeoff-value">${(rail.reliability * 100).toFixed(1)}%</div>
+      <div class="tradeoff-sub">Historical corridor TSR</div>
+    </div>`;
+  el.style.display = 'grid';
+}
+
+function renderVisaNote(noteEl, bodyEl) {
+  const recipientLabel = {
+    debit_card: '16-digit PAN (debit card)',
+    bank_account: 'bank account',
+    crypto_wallet: 'crypto/stablecoin wallet',
+  }[state.recipientType] || state.recipientType;
+
+  bodyEl.innerHTML = `This prototype shows routing decisions at the <strong>platform/client layer</strong> — a business choosing between networks (VD Card (VisaNet), SWIFT, Blockchain/Crypto etc.) for a given payment. The same routing intelligence applies <strong>one level deeper, within a payment network</strong>: as networks develop multiple rails to the same endpoint, the AI can optimize between them.<br><br>
+  <strong>Example for a ${recipientLabel} endpoint:</strong> Today, a ${recipientLabel} is typically reached via a single network path. In a future state where the same endpoint is reachable via both a traditional card/bank rail <em>and</em> a network-operated stablecoin/blockchain rail, the routing engine would apply the same scoring logic — cost, speed, reliability — to select the optimal <em>intra-network</em> path, invisible to the originating platform.`;
+  noteEl.style.display = 'block';
+}
+</script>
+</body>
+</html>
