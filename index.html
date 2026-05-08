@@ -161,6 +161,10 @@
     border: 1px solid rgba(247,147,79,0.4);
     background: rgba(247,147,79,0.07);
   }
+  .reg-flag.caution {
+    border-color: rgba(247,199,79,0.4);
+    background: rgba(247,199,79,0.06);
+  }
   .reg-flag-header {
     display: flex;
     align-items: center;
@@ -171,6 +175,7 @@
     font-weight: 500;
     margin-bottom: 4px;
   }
+  .reg-flag.caution .reg-flag-header { color: var(--gold); }
   .reg-flag-detail {
     font-size: 11px;
     color: var(--text-muted);
@@ -192,6 +197,11 @@
     color: var(--warn);
     border: 1px solid rgba(247,147,79,0.35);
     white-space: nowrap;
+  }
+  .reg-warning-badge.caution {
+    background: rgba(247,199,79,0.12);
+    color: var(--gold);
+    border-color: rgba(247,199,79,0.35);
   }
 
   /* Visa note box */
@@ -530,6 +540,13 @@ const regulatoryRestrictions = {
       detail: "Brazil's central bank bans eFX providers from using stablecoins or crypto (USDC, USDT, BTC) as the settlement rail for regulated cross-border payments. Available only to BCB-licensed VASP institutions (banks, authorised FX brokers). Unlicensed eFX providers must migrate to fiat rails by Oct 1, 2026.",
       source: 'BCB Resolution No. 561, published Apr 30, 2026',
     },
+    NG: {
+      level: 'caution',
+      label: 'Regulatory caution',
+      summary: 'Capital controls + evolving VASP licensing framework',
+      detail: "Nigeria enforces capital controls that can affect stablecoin off-ramps. The CBN has had a complex history with crypto — banning bank services to exchanges in 2021, partially reversing in 2023, and now developing a structured VASP licensing framework. Crypto-based XB settlement into Nigeria operates in a regulatory grey zone: widespread in practice (~$26B USDT volume in 2024) but without clear authorisation. Verify local partner licensing status before routing.",
+      source: 'CBN circular 2021/2023; Chainalysis 2025 Geography of Crypto report',
+    },
   },
 };
 
@@ -749,7 +766,7 @@ function renderQuotes() {
         ${instantCorridors[name] ? `<div class="muted mt8" style="font-size:10px;color:${props.supportsInstant ? 'var(--accent2)' : 'var(--text-dim)'}">${props.instantNote}</div>` : ''}
         ${rail.fxConversions > 0 ? `<div class="quote-metric"><span class="quote-metric-label" style="color:var(--text-dim)">FX conversions</span><span class="quote-metric-value" style="font-size:11px;color:var(--text-muted)">${rail.fxConversions}</span></div>` : ''}
         ${rail.note ? `<div class="muted mt8" style="font-size:10px;line-height:1.4">${rail.note}</div>` : ''}
-        ${getRegulatoryStatus(name) ? '<div class="reg-flag"><div class="reg-flag-header">⚠ ' + getRegulatoryStatus(name).label + '</div><div class="reg-flag-detail">' + getRegulatoryStatus(name).detail + '</div><div class="reg-flag-source">' + getRegulatoryStatus(name).source + '</div></div>' : ''}
+        ${getRegulatoryStatus(name) ? '<div class="reg-flag ' + getRegulatoryStatus(name).level + '"><div class="reg-flag-header">⚠ ' + getRegulatoryStatus(name).label + '</div><div class="reg-flag-detail">' + getRegulatoryStatus(name).detail + '</div><div class="reg-flag-source">' + getRegulatoryStatus(name).source + '</div></div>' : ''}
         <div class="muted mt8">Estimates — not locked</div>
       </div>`;
   }).join('');
@@ -863,8 +880,9 @@ async function renderAI(silent = false) {
 
   const prevalidNote = rail.prevalidation ? ` Pre-validation: ${rail.prevalidation}.` : '';
   const regStatus = getRegulatoryStatus(state.selectedRail);
+  const regNoteColor = regStatus?.level === 'caution' ? 'var(--gold)' : 'var(--warn)';
   const regNote = regStatus
-    ? ` <span style="color:var(--warn)">⚠ Regulatory note: ${regStatus.summary}. ${regStatus.detail}</span>`
+    ? ` <span style="color:${regNoteColor}">⚠ Regulatory note (${regStatus.label}): ${regStatus.summary}. ${regStatus.detail}</span>`
     : '';
 
   const fullText =
